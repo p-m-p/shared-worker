@@ -3,6 +3,7 @@ import { AgGridReact } from 'ag-grid-react';
 import { ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
 import { PriceCellRenderer } from './components/PriceCellRenderer';
 import { ChangeCellRenderer } from './components/ChangeCellRenderer';
+import { ChangePercentCellRenderer } from './components/ChangePercentCellRenderer';
 import { MetricCellRenderer } from './components/MetricCellRenderer';
 import './style.css';
 
@@ -65,12 +66,7 @@ export default function App() {
         field: 'changePercent',
         headerName: 'Change %',
         width: 120,
-        cellRenderer: (props) => {
-          const val = props.value || 0;
-          const className = val >= 0 ? 'change-positive' : 'change-negative';
-          const formatted = (val >= 0 ? '+' : '') + val.toFixed(2) + '%';
-          return <div className={className}>{formatted}</div>;
-        },
+        cellRenderer: ChangePercentCellRenderer,
       },
       {
         field: 'volume',
@@ -107,6 +103,9 @@ export default function App() {
     }),
     animateRows: false,
     suppressRowTransform: true,
+    suppressCellFocus: true,
+    enableCellChangeFlash: false,
+    suppressFieldDotNotation: true,
     getRowId: params => params.data.symbol,
   }), []);
 
@@ -119,8 +118,18 @@ export default function App() {
       const startTime = performance.now();
 
       if (pendingUpdatesRef.current.size > 0 && gridRef.current) {
+        // Merge delta updates with existing grid data to preserve unchanged fields
+        const mergedUpdates = Array.from(pendingUpdatesRef.current.values()).map(delta => {
+          const existingRow = gridRef.current.api.getRowNode(delta.symbol);
+          if (existingRow && existingRow.data) {
+            // Merge delta with existing row data
+            return { ...existingRow.data, ...delta };
+          }
+          return delta;
+        });
+
         const transaction = {
-          update: Array.from(pendingUpdatesRef.current.values())
+          update: mergedUpdates
         };
 
         gridRef.current.api.applyTransaction(transaction);
@@ -145,7 +154,13 @@ export default function App() {
 
   const queueUpdate = (updates) => {
     updates.forEach(row => {
-      pendingUpdatesRef.current.set(row.symbol, row);
+      // Merge delta with existing row data to preserve unchanged fields
+      const existing = pendingUpdatesRef.current.get(row.symbol);
+      if (existing) {
+        pendingUpdatesRef.current.set(row.symbol, { ...existing, ...row });
+      } else {
+        pendingUpdatesRef.current.set(row.symbol, row);
+      }
     });
     scheduleFrame();
   };

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 
-export const MetricCellRenderer = (props) => {
+export const MetricCellRenderer = memo((props) => {
   const [prevValue, setPrevValue] = useState(props.value);
   const [flashClass, setFlashClass] = useState('');
 
@@ -20,4 +20,4 @@ export const MetricCellRenderer = (props) => {
       {props.value?.toFixed(2) || '0.00'}
     </div>
   );
-};
+});

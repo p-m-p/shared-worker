@@ -45,7 +45,7 @@ wss.on('connection', (ws) => {
     data: Object.values(marketData)
   }));
 
-  // Send random bursts of updates at high frequency
+  // Send random bursts of updates at high frequency with delta updates
   const sendUpdates = () => {
     const batchSize = Math.floor(Math.random() * 20) + 10; // 10-30 updates per batch
     const updates = [];
@@ -53,6 +53,9 @@ wss.on('connection', (ws) => {
     for (let i = 0; i < batchSize; i++) {
       const symbol = instruments[Math.floor(Math.random() * instruments.length)];
       const data = marketData[symbol];
+
+      // Build delta update with only changed fields
+      const delta = { symbol };
 
       // Random price change
       const oldPrice = data.price;
@@ -64,14 +67,24 @@ wss.on('connection', (ws) => {
       data.change = data.price - oldPrice;
       data.changePercent = (data.change / oldPrice) * 100;
 
-      // Update random metrics
+      // Add changed price fields to delta
+      delta.price = data.price;
+      delta.bid = data.bid;
+      delta.ask = data.ask;
+      delta.volume = data.volume;
+      delta.change = data.change;
+      delta.changePercent = data.changePercent;
+
+      // Update random metrics (only send changed ones)
       const metricsToUpdate = Math.floor(Math.random() * 20) + 10;
       for (let j = 0; j < metricsToUpdate; j++) {
         const metricNum = Math.floor(Math.random() * 100) + 1;
-        data[`metric${metricNum}`] = Math.random() * 1000;
+        const metricKey = `metric${metricNum}`;
+        data[metricKey] = Math.random() * 1000;
+        delta[metricKey] = data[metricKey];
       }
 
-      updates.push({ ...data });
+      updates.push(delta);
     }
 
     ws.send(JSON.stringify({

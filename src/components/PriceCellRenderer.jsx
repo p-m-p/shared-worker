@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, memo } from 'react';
 
-export const PriceCellRenderer = (props) => {
+export const PriceCellRenderer = memo((props) => {
   const [prevValue, setPrevValue] = useState(props.value);
   const [flashClass, setFlashClass] = useState('');
 
@@ -21,4 +21,4 @@ export const PriceCellRenderer = (props) => {
       ${props.value?.toFixed(2) || '0.00'}
     </div>
   );
-};
+});

@@ -38,19 +38,43 @@ High-frequency market data grid demonstrating AG Grid virtualization and multi-t
 - Enables smooth scrolling despite large dataset
 - Row animations disabled (`animateRows: false`, `suppressRowTransform: true`)
 
-### 4. React Cell Renderers
+### 4. Delta Updates
+
+**Server-Side Optimization:**
+- Sends only changed fields per update, not entire row objects
+- Typical update: ~17 fields instead of 107 total fields
+- **~84% reduction in payload size** per update
+- Reduces JSON parsing overhead and network bandwidth
+
+**Implementation:**
+- Server tracks changed metrics and price fields
+- Delta object contains: symbol + changed fields only
+- Client-side transaction updates merge deltas with existing rows
+
+### 5. React Cell Renderers with Memoization
 
 **Custom Components:**
 - `PriceCellRenderer` - Tracks value changes with useEffect, triggers 200ms flash
 - `MetricCellRenderer` - Reusable across 100 metric columns, short animation cycles
 - `ChangeCellRenderer` - Static formatting with CSS classes
+- `ChangePercentCellRenderer` - Percentage formatting with color coding
 
-**Benefits:**
+**Optimizations:**
+- All components wrapped in `React.memo()` to prevent unnecessary re-renders
 - Component-level state management for animations
 - Efficient re-rendering via React's reconciliation
 - Declarative flash animations without grid configuration
 
-### 5. Server-Side Stress Testing
+### 6. AG Grid Performance Tuning
+
+**Disabled Features:**
+- `enableCellChangeFlash: false` - Using custom React renderers instead
+- `suppressCellFocus: true` - Reduces focus management overhead
+- `suppressFieldDotNotation: true` - Faster field access (simple field names)
+- `animateRows: false` - No row position animations
+- `suppressRowTransform: true` - Disables CSS transform animations during scroll
+
+### 7. Server-Side Stress Testing
 
 - Updates every 5-20ms (50-200 updates/sec)
 - Batch size: 10-30 rows per update
