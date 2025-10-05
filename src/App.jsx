@@ -221,13 +221,20 @@ export default function App() {
   }, []);
 
   return (
-    <div style={{ padding: '20px' }}>
+    <div style={{
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100vh',
+      padding: '20px',
+      boxSizing: 'border-box'
+    }}>
       <div style={{
         marginBottom: '10px',
         padding: '8px',
         background: '#1e1e1e',
         border: '1px solid #3a3a3a',
-        borderRadius: '4px'
+        borderRadius: '4px',
+        flexShrink: 0
       }}>
         Status: <span style={{ color: connectionStatus === 'Connected' ? 'green' : 'red' }}>
           {connectionStatus}
@@ -240,7 +247,8 @@ export default function App() {
         border: '1px solid #3a3a3a',
         borderRadius: '4px',
         fontFamily: 'monospace',
-        fontSize: '12px'
+        fontSize: '12px',
+        flexShrink: 0
       }}>
         <strong>Performance:</strong>{' '}
         Updates/sec: {perfMetrics.fps} |{' '}
@@ -249,7 +257,7 @@ export default function App() {
         Max: {perfMetrics.max}ms |{' '}
         Total: {perfMetrics.total}
       </div>
-      <div style={{ height: '600px', width: '100%' }}>
+      <div style={{ flex: 1, width: '100%', minHeight: 0 }}>
         <AgGridReact
           ref={gridRef}
           rowData={rowData}
