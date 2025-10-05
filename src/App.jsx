@@ -118,20 +118,20 @@ export default function App() {
 
       if (pendingUpdatesRef.current.size > 0 && gridRef.current) {
         // Merge delta updates with existing grid data to preserve unchanged fields
-        const mergedUpdates = Array.from(pendingUpdatesRef.current.values()).map(delta => {
-          const existingRow = gridRef.current.api.getRowNode(delta.symbol);
-          if (existingRow && existingRow.data) {
-            // Merge delta with existing row data
-            return { ...existingRow.data, ...delta };
+        const updates = [];
+        const api = gridRef.current.api;
+
+        for (const delta of pendingUpdatesRef.current.values()) {
+          const existingRow = api.getRowNode(delta.symbol);
+          if (existingRow?.data) {
+            // Create new object with merged data (immutable)
+            updates.push(Object.assign({}, existingRow.data, delta));
+          } else {
+            updates.push(delta);
           }
-          return delta;
-        });
+        }
 
-        const transaction = {
-          update: mergedUpdates
-        };
-
-        gridRef.current.api.applyTransaction(transaction);
+        api.applyTransaction({ update: updates });
         pendingUpdatesRef.current.clear();
 
         // Track performance
