@@ -67,8 +67,7 @@ High-frequency market data grid demonstrating AG Grid virtualization and multi-t
 
 ### 6. AG Grid Performance Tuning
 
-**Disabled Features:**
-- `enableCellChangeFlash: false` - Using custom React renderers instead
+**Configuration:**
 - `suppressCellFocus: true` - Reduces focus management overhead
 - `suppressFieldDotNotation: true` - Faster field access (simple field names)
 - `animateRows: false` - No row position animations

@@ -104,7 +104,6 @@ export default function App() {
     animateRows: false,
     suppressRowTransform: true,
     suppressCellFocus: true,
-    enableCellChangeFlash: false,
     suppressFieldDotNotation: true,
     getRowId: params => params.data.symbol,
   }), []);
