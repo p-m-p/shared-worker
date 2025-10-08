@@ -1,8 +1,9 @@
 // Shared Web Worker for WebSocket connection
 let ws = null;
-let ports = [];
+let ports = new Map(); // Map of port -> last heartbeat timestamp
 let reconnectTimeout = null;
 let lastInitialData = null; // Store the initial data for new connections
+let heartbeatInterval = null;
 
 // Batching mechanism to prevent overloading the grid
 let pendingUpdates = new Map(); // Map of symbol -> latest update
@@ -77,32 +78,85 @@ function connect() {
 }
 
 function broadcast(message, targetPort = null) {
-  const targetPorts = targetPort ? [targetPort] : ports;
+  const targetPorts = targetPort ? [targetPort] : Array.from(ports.keys());
   targetPorts.forEach(port => {
     try {
       port.postMessage(message);
     } catch (e) {
       console.error('[Worker] Error sending message to port:', e);
+      // Remove failed port
+      removePort(port);
     }
   });
+}
+
+function removePort(port) {
+  if (ports.has(port)) {
+    ports.delete(port);
+    console.log('[Worker] Port removed. Total ports:', ports.size);
+    checkCleanup();
+  }
+}
+
+function checkCleanup() {
+  // If no more ports, close WebSocket and cleanup
+  if (ports.size === 0) {
+    console.log('[Worker] No more ports, closing WebSocket');
+    if (reconnectTimeout) {
+      clearTimeout(reconnectTimeout);
+      reconnectTimeout = null;
+    }
+    if (heartbeatInterval) {
+      clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
+    }
+    if (ws) {
+      ws.close();
+      ws = null;
+    }
+  }
+}
+
+function checkHeartbeats() {
+  const now = Date.now();
+  const HEARTBEAT_TIMEOUT = 5000; // 5 seconds
+
+  for (const [port, lastHeartbeat] of ports.entries()) {
+    if (now - lastHeartbeat > HEARTBEAT_TIMEOUT) {
+      console.log('[Worker] Port heartbeat timeout, removing');
+      removePort(port);
+    }
+  }
+}
+
+function startHeartbeatMonitoring() {
+  if (heartbeatInterval) return;
+  heartbeatInterval = setInterval(checkHeartbeats, 2000); // Check every 2 seconds
 }
 
 // Handle new connections from browser tabs
 self.onconnect = (e) => {
   const port = e.ports[0];
-  ports.push(port);
+  ports.set(port, Date.now());
 
-  console.log('[Worker] New port connected. Total ports:', ports.length);
+  console.log('[Worker] New port connected. Total ports:', ports.size);
+
+  port.start();
 
   port.onmessage = (event) => {
     if (event.data.type === 'ping') {
+      // Update last heartbeat timestamp
+      const now = Date.now();
+      ports.set(port, now);
       port.postMessage({ type: 'pong' });
+      console.log('[Worker] Received ping, updated heartbeat for port');
     }
   };
 
   // If this is the first connection, establish WebSocket
-  if (ports.length === 1) {
+  if (ports.size === 1) {
     connect();
+    startHeartbeatMonitoring();
   } else {
     // Send stored initial data to new port if available
     if (lastInitialData) {
@@ -114,28 +168,4 @@ self.onconnect = (e) => {
       type: ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'disconnected'
     });
   }
-
-  // Handle port disconnection
-  port.addEventListener('close', () => {
-    const index = ports.indexOf(port);
-    if (index > -1) {
-      ports.splice(index, 1);
-      console.log('[Worker] Port disconnected. Total ports:', ports.length);
-    }
-
-    // If no more ports, close WebSocket and cleanup
-    if (ports.length === 0) {
-      console.log('[Worker] No more ports, closing WebSocket');
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-        reconnectTimeout = null;
-      }
-      if (ws) {
-        ws.close();
-        ws = null;
-      }
-    }
-  });
-
-  port.start();
 };

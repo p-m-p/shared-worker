@@ -210,12 +210,22 @@ export default function App() {
         case 'update':
           queueUpdate(message.data);
           break;
+
+        case 'pong':
+          // Heartbeat response received
+          break;
       }
     };
 
     worker.port.start();
 
+    // Send heartbeat ping every 2 seconds
+    const heartbeatInterval = setInterval(() => {
+      worker.port.postMessage({ type: 'ping' });
+    }, 2000);
+
     return () => {
+      clearInterval(heartbeatInterval);
       worker.port.close();
     };
   }, []);
