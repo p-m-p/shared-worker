@@ -168,6 +168,30 @@ self.onconnect = (e) => {
     } else if (event.data.type === "disconnect") {
       console.log(`[Worker] Port ${portInfo.id} explicit disconnect`);
       removePort(port);
+    } else if (event.data.type === "setFrequency") {
+      const frequency = event.data.frequency;
+      console.log(`[Worker] Setting update frequency to ${frequency}ms`);
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "setFrequency", frequency }));
+      }
+      // Broadcast frequency change to all other ports
+      for (const [p, info] of ports.entries()) {
+        if (p !== port) {
+          p.postMessage({ type: "frequencyChanged", frequency });
+        }
+      }
+    } else if (event.data.type === "setBatchSize") {
+      const { min, max } = event.data;
+      console.log(`[Worker] Setting batch size to ${min}-${max}`);
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "setBatchSize", min, max }));
+      }
+      // Broadcast batch size change to all other ports
+      for (const [p, info] of ports.entries()) {
+        if (p !== port) {
+          p.postMessage({ type: "batchSizeChanged", min, max });
+        }
+      }
     }
   };
 

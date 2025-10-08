@@ -25,6 +25,9 @@ const perfStats = {
 export default function App() {
   const [rowData, setRowData] = useState([]);
   const [connectionStatus, setConnectionStatus] = useState("Connecting...");
+  const [updateFrequency, setUpdateFrequency] = useState(100);
+  const [batchSizeMin, setBatchSizeMin] = useState(10);
+  const [batchSizeMax, setBatchSizeMax] = useState(30);
   const [perfMetrics, setPerfMetrics] = useState({
     avg: "0",
     min: "0",
@@ -229,6 +232,15 @@ export default function App() {
             // Respond to ping from worker
             w.port.postMessage({ type: "pong" });
             break;
+
+          case "frequencyChanged":
+            setUpdateFrequency(message.frequency);
+            break;
+
+          case "batchSizeChanged":
+            setBatchSizeMin(message.min);
+            setBatchSizeMax(message.max);
+            break;
         }
       };
 
@@ -303,14 +315,106 @@ export default function App() {
           border: "1px solid #3a3a3a",
           borderRadius: "4px",
           flexShrink: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: "20px",
         }}
       >
-        Status:{" "}
-        <span
-          style={{ color: connectionStatus === "Connected" ? "green" : "red" }}
-        >
-          {connectionStatus}
-        </span>
+        <div>
+          Status:{" "}
+          <span
+            style={{ color: connectionStatus === "Connected" ? "green" : "red" }}
+          >
+            {connectionStatus}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <label htmlFor="frequency">Update Frequency (ms):</label>
+          <input
+            id="frequency"
+            type="number"
+            min="10"
+            max="10000"
+            step="10"
+            value={updateFrequency}
+            onChange={(e) => {
+              const freq = parseInt(e.target.value, 10);
+              setUpdateFrequency(freq);
+              if (workerRef.current) {
+                workerRef.current.port.postMessage({
+                  type: "setFrequency",
+                  frequency: freq,
+                });
+              }
+            }}
+            style={{
+              width: "80px",
+              padding: "4px",
+              background: "#2a2a2a",
+              border: "1px solid #3a3a3a",
+              color: "white",
+              borderRadius: "4px",
+            }}
+          />
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <label htmlFor="batchMin">Batch Size:</label>
+          <input
+            id="batchMin"
+            type="number"
+            min="1"
+            max="500"
+            step="1"
+            value={batchSizeMin}
+            onChange={(e) => {
+              const min = parseInt(e.target.value, 10);
+              setBatchSizeMin(min);
+              if (workerRef.current) {
+                workerRef.current.port.postMessage({
+                  type: "setBatchSize",
+                  min: min,
+                  max: batchSizeMax,
+                });
+              }
+            }}
+            style={{
+              width: "60px",
+              padding: "4px",
+              background: "#2a2a2a",
+              border: "1px solid #3a3a3a",
+              color: "white",
+              borderRadius: "4px",
+            }}
+          />
+          <span>-</span>
+          <input
+            id="batchMax"
+            type="number"
+            min="1"
+            max="500"
+            step="1"
+            value={batchSizeMax}
+            onChange={(e) => {
+              const max = parseInt(e.target.value, 10);
+              setBatchSizeMax(max);
+              if (workerRef.current) {
+                workerRef.current.port.postMessage({
+                  type: "setBatchSize",
+                  min: batchSizeMin,
+                  max: max,
+                });
+              }
+            }}
+            style={{
+              width: "60px",
+              padding: "4px",
+              background: "#2a2a2a",
+              border: "1px solid #3a3a3a",
+              color: "white",
+              borderRadius: "4px",
+            }}
+          />
+        </div>
       </div>
       <div
         style={{
