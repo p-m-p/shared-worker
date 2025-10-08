@@ -1,11 +1,15 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
-import { AgGridReact } from 'ag-grid-react';
-import { ModuleRegistry, AllCommunityModule, themeQuartz } from 'ag-grid-community';
-import { PriceCellRenderer } from './components/PriceCellRenderer';
-import { ChangeCellRenderer } from './components/ChangeCellRenderer';
-import { ChangePercentCellRenderer } from './components/ChangePercentCellRenderer';
-import { MetricCellRenderer } from './components/MetricCellRenderer';
-import './style.css';
+import { useState, useEffect, useRef, useMemo } from "react";
+import { AgGridReact } from "ag-grid-react";
+import {
+  ModuleRegistry,
+  AllCommunityModule,
+  themeQuartz,
+} from "ag-grid-community";
+import { PriceCellRenderer } from "./components/PriceCellRenderer";
+import { ChangeCellRenderer } from "./components/ChangeCellRenderer";
+import { ChangePercentCellRenderer } from "./components/ChangePercentCellRenderer";
+import { MetricCellRenderer } from "./components/MetricCellRenderer";
+import "./style.css";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
 
@@ -20,13 +24,13 @@ const perfStats = {
 
 export default function App() {
   const [rowData, setRowData] = useState([]);
-  const [connectionStatus, setConnectionStatus] = useState('Connecting...');
+  const [connectionStatus, setConnectionStatus] = useState("Connecting...");
   const [perfMetrics, setPerfMetrics] = useState({
-    avg: '0',
-    min: '0',
-    max: '0',
-    fps: '0',
-    total: '0'
+    avg: "0",
+    min: "0",
+    max: "0",
+    fps: "0",
+    total: "0",
   });
 
   const gridRef = useRef(null);
@@ -37,43 +41,43 @@ export default function App() {
   // Column definitions with React cell renderers
   const columnDefs = useMemo(() => {
     const cols = [
-      { field: 'symbol', headerName: 'Symbol', width: 100, pinned: 'left' },
+      { field: "symbol", headerName: "Symbol", width: 100, pinned: "left" },
       {
-        field: 'price',
-        headerName: 'Price',
+        field: "price",
+        headerName: "Price",
         width: 120,
         cellRenderer: PriceCellRenderer,
       },
       {
-        field: 'bid',
-        headerName: 'Bid',
+        field: "bid",
+        headerName: "Bid",
         width: 120,
-        valueFormatter: params => '$' + params.value?.toFixed(2)
+        valueFormatter: (params) => "$" + params.value?.toFixed(2),
       },
       {
-        field: 'ask',
-        headerName: 'Ask',
+        field: "ask",
+        headerName: "Ask",
         width: 120,
-        valueFormatter: params => '$' + params.value?.toFixed(2)
+        valueFormatter: (params) => "$" + params.value?.toFixed(2),
       },
       {
-        field: 'change',
-        headerName: 'Change',
+        field: "change",
+        headerName: "Change",
         width: 120,
         cellRenderer: ChangeCellRenderer,
       },
       {
-        field: 'changePercent',
-        headerName: 'Change %',
+        field: "changePercent",
+        headerName: "Change %",
         width: 120,
         cellRenderer: ChangePercentCellRenderer,
       },
       {
-        field: 'volume',
-        headerName: 'Volume',
+        field: "volume",
+        headerName: "Volume",
         width: 140,
-        valueFormatter: params => params.value?.toLocaleString()
-      }
+        valueFormatter: (params) => params.value?.toLocaleString(),
+      },
     ];
 
     // Add 100 metric columns with custom renderer
@@ -89,24 +93,27 @@ export default function App() {
     return cols;
   }, []);
 
-  const gridOptions = useMemo(() => ({
-    defaultColDef: {
-      sortable: true,
-      filter: true,
-      resizable: true
-    },
-    theme: themeQuartz.withParams({
-      backgroundColor: '#1e1e1e',
-      foregroundColor: 'rgba(255, 255, 255, 0.87)',
-      headerBackgroundColor: '#2a2a2a',
-      oddRowBackgroundColor: '#1a1a1a',
+  const gridOptions = useMemo(
+    () => ({
+      defaultColDef: {
+        sortable: true,
+        filter: true,
+        resizable: true,
+      },
+      theme: themeQuartz.withParams({
+        backgroundColor: "#1e1e1e",
+        foregroundColor: "rgba(255, 255, 255, 0.87)",
+        headerBackgroundColor: "#2a2a2a",
+        oddRowBackgroundColor: "#1a1a1a",
+      }),
+      animateRows: false,
+      suppressRowTransform: true,
+      suppressCellFocus: true,
+      suppressFieldDotNotation: true,
+      getRowId: (params) => params.data.symbol,
     }),
-    animateRows: false,
-    suppressRowTransform: true,
-    suppressCellFocus: true,
-    suppressFieldDotNotation: true,
-    getRowId: params => params.data.symbol,
-  }), []);
+    [],
+  );
 
   // Batching mechanism
   const scheduleFrame = () => {
@@ -152,7 +159,7 @@ export default function App() {
   };
 
   const queueUpdate = (updates) => {
-    updates.forEach(row => {
+    updates.forEach((row) => {
       // Merge delta with existing row data to preserve unchanged fields
       const existing = pendingUpdatesRef.current.get(row.symbol);
       if (existing) {
@@ -168,13 +175,15 @@ export default function App() {
   useEffect(() => {
     const interval = setInterval(() => {
       if (perfStats.updateCount > 0) {
-        const avgTime = (perfStats.totalUpdateTime / perfStats.updateCount).toFixed(2);
+        const avgTime = (
+          perfStats.totalUpdateTime / perfStats.updateCount
+        ).toFixed(2);
         setPerfMetrics({
           avg: avgTime,
           min: perfStats.minUpdateTime.toFixed(2),
           max: perfStats.maxUpdateTime.toFixed(2),
           fps: perfStats.lastSecondUpdates.toString(),
-          total: perfStats.updateCount.toString()
+          total: perfStats.updateCount.toString(),
         });
         perfStats.lastSecondUpdates = 0;
       }
@@ -185,89 +194,141 @@ export default function App() {
 
   // Shared worker setup
   useEffect(() => {
-    const worker = new SharedWorker(new URL('./market-worker.js', import.meta.url), {
-      type: 'module'
-    });
+    let worker = new SharedWorker(
+      new URL("./market-worker.js", import.meta.url),
+      {
+        name: "market-worker",
+        type: "module",
+      },
+    );
 
+    let isActive = true;
+
+    const setupWorker = (w) => {
+      w.port.onmessage = (event) => {
+        const message = event.data;
+
+        switch (message.type) {
+          case "connected":
+            setConnectionStatus("Connected");
+            break;
+
+          case "disconnected":
+            setConnectionStatus("Disconnected");
+            break;
+
+          case "initial":
+            setRowData(message.data);
+            break;
+
+          case "update":
+            queueUpdate(message.data);
+            break;
+
+          case "ping":
+            // Respond to ping from worker
+            w.port.postMessage({ type: "pong" });
+            break;
+        }
+      };
+
+      w.port.start();
+    };
+
+    setupWorker(worker);
     workerRef.current = worker;
 
-    worker.port.onmessage = (event) => {
-      const message = event.data;
+    // Handle visibility changes to reconnect if needed
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isActive) {
+        console.log("[Client] Tab visible, reconnecting to shared worker");
 
-      switch (message.type) {
-        case 'connected':
-          setConnectionStatus('Connected');
-          break;
+        // Close old connection
+        if (workerRef.current) {
+          workerRef.current.port.postMessage({ type: "disconnect" });
+          workerRef.current.port.close();
+        }
 
-        case 'disconnected':
-          setConnectionStatus('Disconnected');
-          break;
+        // Create new connection
+        worker = new SharedWorker(
+          new URL("./market-worker.js", import.meta.url),
+          {
+            name: "market-worker",
+            type: "module",
+          },
+        );
 
-        case 'initial':
-          setRowData(message.data);
-          break;
-
-        case 'update':
-          queueUpdate(message.data);
-          break;
-
-        case 'pong':
-          // Heartbeat response received
-          break;
+        setupWorker(worker);
+        workerRef.current = worker;
       }
     };
 
-    worker.port.start();
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
-    // Send heartbeat ping every 2 seconds
-    const heartbeatInterval = setInterval(() => {
-      worker.port.postMessage({ type: 'ping' });
-    }, 2000);
+    // Send disconnect message before page unloads
+    const handleBeforeUnload = () => {
+      if (workerRef.current) {
+        workerRef.current.port.postMessage({ type: "disconnect" });
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
-      clearInterval(heartbeatInterval);
-      worker.port.close();
+      isActive = false;
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      if (workerRef.current) {
+        workerRef.current.port.postMessage({ type: "disconnect" });
+        workerRef.current.port.close();
+      }
     };
   }, []);
 
   return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      height: '100vh',
-      padding: '20px',
-      boxSizing: 'border-box'
-    }}>
-      <div style={{
-        marginBottom: '10px',
-        padding: '8px',
-        background: '#1e1e1e',
-        border: '1px solid #3a3a3a',
-        borderRadius: '4px',
-        flexShrink: 0
-      }}>
-        Status: <span style={{ color: connectionStatus === 'Connected' ? 'green' : 'red' }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        height: "100vh",
+        padding: "20px",
+        boxSizing: "border-box",
+      }}
+    >
+      <div
+        style={{
+          marginBottom: "10px",
+          padding: "8px",
+          background: "#1e1e1e",
+          border: "1px solid #3a3a3a",
+          borderRadius: "4px",
+          flexShrink: 0,
+        }}
+      >
+        Status:{" "}
+        <span
+          style={{ color: connectionStatus === "Connected" ? "green" : "red" }}
+        >
           {connectionStatus}
         </span>
       </div>
-      <div style={{
-        marginBottom: '10px',
-        padding: '8px',
-        background: '#1e1e1e',
-        border: '1px solid #3a3a3a',
-        borderRadius: '4px',
-        fontFamily: 'monospace',
-        fontSize: '12px',
-        flexShrink: 0
-      }}>
-        <strong>Performance:</strong>{' '}
-        Updates/sec: {perfMetrics.fps} |{' '}
-        Avg: {perfMetrics.avg}ms |{' '}
-        Min: {perfMetrics.min}ms |{' '}
-        Max: {perfMetrics.max}ms |{' '}
-        Total: {perfMetrics.total}
+      <div
+        style={{
+          marginBottom: "10px",
+          padding: "8px",
+          background: "#1e1e1e",
+          border: "1px solid #3a3a3a",
+          borderRadius: "4px",
+          fontFamily: "monospace",
+          fontSize: "12px",
+          flexShrink: 0,
+        }}
+      >
+        <strong>Performance:</strong> Updates/sec: {perfMetrics.fps} | Avg:{" "}
+        {perfMetrics.avg}ms | Min: {perfMetrics.min}ms | Max: {perfMetrics.max}
+        ms | Total: {perfMetrics.total}
       </div>
-      <div style={{ flex: 1, width: '100%', minHeight: 0 }}>
+      <div style={{ flex: 1, width: "100%", minHeight: 0 }}>
         <AgGridReact
           ref={gridRef}
           rowData={rowData}

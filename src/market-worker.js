@@ -1,8 +1,9 @@
 // Shared Web Worker for WebSocket connection
 let ws = null;
-let ports = new Map(); // Map of port -> last heartbeat timestamp
+let ports = new Map(); // Map of port -> { id, lastPong }
 let reconnectTimeout = null;
 let lastInitialData = null; // Store the initial data for new connections
+let nextPortId = 1;
 let heartbeatInterval = null;
 
 // Batching mechanism to prevent overloading the grid
@@ -15,9 +16,9 @@ function flushBatch() {
 
   const batchedData = Array.from(pendingUpdates.values());
   broadcast({
-    type: 'update',
+    type: "update",
     data: batchedData,
-    timestamp: Date.now()
+    timestamp: Date.now(),
   });
 
   pendingUpdates.clear();
@@ -30,23 +31,23 @@ function scheduleBatch() {
 }
 
 function connect() {
-  ws = new WebSocket('ws://localhost:8080');
+  ws = new WebSocket("ws://localhost:8080");
 
   ws.onopen = () => {
-    console.log('[Worker] Connected to WebSocket server');
-    broadcast({ type: 'connected' });
+    console.log("[Worker] Connected to WebSocket server");
+    broadcast({ type: "connected" });
   };
 
   ws.onmessage = (event) => {
     const message = JSON.parse(event.data);
 
     // Store initial data for new connections
-    if (message.type === 'initial') {
+    if (message.type === "initial") {
       lastInitialData = message;
       broadcast(message);
-    } else if (message.type === 'update') {
+    } else if (message.type === "update") {
       // Batch updates instead of broadcasting immediately
-      message.data.forEach(row => {
+      message.data.forEach((row) => {
         pendingUpdates.set(row.symbol, row);
       });
       scheduleBatch();
@@ -56,8 +57,8 @@ function connect() {
   };
 
   ws.onclose = () => {
-    console.log('[Worker] Disconnected from WebSocket server');
-    broadcast({ type: 'disconnected' });
+    console.log("[Worker] Disconnected from WebSocket server");
+    broadcast({ type: "disconnected" });
 
     // Flush any pending updates before closing
     if (batchTimer) {
@@ -65,35 +66,34 @@ function connect() {
       flushBatch();
     }
 
-    // Attempt to reconnect after 2 seconds
-    reconnectTimeout = setTimeout(() => {
-      console.log('[Worker] Attempting to reconnect...');
-      connect();
-    }, 2000);
+    // Only attempt to reconnect if there are active ports
+    if (ports.size > 0) {
+      reconnectTimeout = setTimeout(() => {
+        console.log("[Worker] Attempting to reconnect...");
+        connect();
+      }, 2000);
+    } else {
+      console.log("[Worker] No active ports, not reconnecting");
+      ws = null;
+    }
   };
 
   ws.onerror = (error) => {
-    console.error('[Worker] WebSocket error:', error);
+    console.error("[Worker] WebSocket error:", error);
   };
 }
 
-function broadcast(message, targetPort = null) {
-  const targetPorts = targetPort ? [targetPort] : Array.from(ports.keys());
-  targetPorts.forEach(port => {
-    try {
-      port.postMessage(message);
-    } catch (e) {
-      console.error('[Worker] Error sending message to port:', e);
-      // Remove failed port
-      removePort(port);
-    }
-  });
+function broadcast(message) {
+  for (const [port] of ports.entries()) {
+    port.postMessage(message);
+  }
 }
 
 function removePort(port) {
   if (ports.has(port)) {
+    const portInfo = ports.get(port);
     ports.delete(port);
-    console.log('[Worker] Port removed. Total ports:', ports.size);
+    console.log(`[Worker] Port ${portInfo.id} removed. Total ports: ${ports.size}`);
     checkCleanup();
   }
 }
@@ -101,7 +101,7 @@ function removePort(port) {
 function checkCleanup() {
   // If no more ports, close WebSocket and cleanup
   if (ports.size === 0) {
-    console.log('[Worker] No more ports, closing WebSocket');
+    console.log("[Worker] No more ports, closing WebSocket");
     if (reconnectTimeout) {
       clearTimeout(reconnectTimeout);
       reconnectTimeout = null;
@@ -119,11 +119,22 @@ function checkCleanup() {
 
 function checkHeartbeats() {
   const now = Date.now();
-  const HEARTBEAT_TIMEOUT = 5000; // 5 seconds
+  const HEARTBEAT_TIMEOUT = 30000; // 30 seconds - generous timeout for background tabs
 
-  for (const [port, lastHeartbeat] of ports.entries()) {
-    if (now - lastHeartbeat > HEARTBEAT_TIMEOUT) {
-      console.log('[Worker] Port heartbeat timeout, removing');
+  for (const [port, portInfo] of ports.entries()) {
+    if (now - portInfo.lastPong > HEARTBEAT_TIMEOUT) {
+      console.log(`[Worker] Port ${portInfo.id} heartbeat timeout (${now - portInfo.lastPong}ms), removing`);
+      removePort(port);
+    }
+  }
+}
+
+function sendHeartbeats() {
+  for (const [port, portInfo] of ports.entries()) {
+    try {
+      port.postMessage({ type: "ping" });
+    } catch (e) {
+      console.error(`[Worker] Error sending ping to port ${portInfo.id}:`, e);
       removePort(port);
     }
   }
@@ -131,30 +142,39 @@ function checkHeartbeats() {
 
 function startHeartbeatMonitoring() {
   if (heartbeatInterval) return;
-  heartbeatInterval = setInterval(checkHeartbeats, 2000); // Check every 2 seconds
+  // Send pings every 10 seconds, timeout after 30 seconds
+  heartbeatInterval = setInterval(() => {
+    sendHeartbeats();
+    checkHeartbeats();
+  }, 10000);
 }
 
 // Handle new connections from browser tabs
 self.onconnect = (e) => {
   const port = e.ports[0];
-  ports.set(port, Date.now());
+  const portId = nextPortId++;
 
-  console.log('[Worker] New port connected. Total ports:', ports.size);
+  ports.set(port, { id: portId, lastPong: Date.now() });
 
-  port.start();
+  console.log(`[Worker] Port ${portId} connected. Total ports: ${ports.size}`);
 
   port.onmessage = (event) => {
-    if (event.data.type === 'ping') {
-      // Update last heartbeat timestamp
-      const now = Date.now();
-      ports.set(port, now);
-      port.postMessage({ type: 'pong' });
-      console.log('[Worker] Received ping, updated heartbeat for port');
+    const portInfo = ports.get(port);
+    if (!portInfo) return;
+
+    if (event.data.type === "pong") {
+      portInfo.lastPong = Date.now();
+      console.log(`[Worker] Port ${portInfo.id} pong received`);
+    } else if (event.data.type === "disconnect") {
+      console.log(`[Worker] Port ${portInfo.id} explicit disconnect`);
+      removePort(port);
     }
   };
 
-  // If this is the first connection, establish WebSocket
-  if (ports.size === 1) {
+  port.start();
+
+  // If no WebSocket connection exists, establish it
+  if (!ws) {
     connect();
     startHeartbeatMonitoring();
   } else {
@@ -165,7 +185,8 @@ self.onconnect = (e) => {
 
     // Notify new port of current connection status
     port.postMessage({
-      type: ws && ws.readyState === WebSocket.OPEN ? 'connected' : 'disconnected'
+      type:
+        ws && ws.readyState === WebSocket.OPEN ? "connected" : "disconnected",
     });
   }
 };
